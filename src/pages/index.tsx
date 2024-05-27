@@ -23,7 +23,6 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      // const result = await logoutUser().unwrap();
       dispatch(clearToken())
       router.push('/login')
     } catch (error) {

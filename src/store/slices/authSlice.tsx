@@ -1,30 +1,31 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit'
 
 type AuthState = {
-  token: string | null;
-  isLogin: boolean;
-};
+  token: string | null
+  isLogin: boolean
+}
 
 const initialState: AuthState = {
   token: '',
-  isLogin: false,
-};
+  isLogin: false
+}
 
 export const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
     setToken: (state, action) => {
-      state.token = action.payload;
-      state.isLogin = true;
+      state.token = action.payload
+      state.isLogin = true
     },
-    clearToken: (state) => {
-      state.token = '';
-      state.isLogin = false;
-    }
-  },
-});
+    clearToken: state => {
+      state.token = ''
+      state.isLogin = false
+    },
+    resetStore: () => initialState
+  }
+})
 
-export const { setToken, clearToken } = authSlice.actions;
+export const { setToken, clearToken, resetStore } = authSlice.actions
 
-export default authSlice.reducer;
+export default authSlice.reducer

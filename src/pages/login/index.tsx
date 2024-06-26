@@ -3,6 +3,7 @@ import { useLoginUserMutation } from '@/store/authApi'
 import { useDispatch } from 'react-redux'
 import { setToken } from '@/store/slices/authSlice'
 import { useRouter } from 'next/router'
+import Cookies from 'js-cookie'
 
 import type { FormProps } from 'antd'
 import { Typography, Layout, Button, Form, Input } from 'antd'
@@ -25,7 +26,14 @@ const Login = () => {
     try {
       const result = await loginUser({ email, password })
       if (result?.data?.data?.accessToken) {
-        dispatch(setToken(result.data.data.accessToken))
+        const token = result.data.data.accessToken
+        const username = result.data.data.user.name || ''
+
+        // 將 token 和 username 存入 cookie
+        Cookies.set('token', token, { expires: 7, secure: true, sameSite: 'strict' })
+        Cookies.set('username', username, { expires: 7, secure: true, sameSite: 'strict' })
+
+        dispatch(setToken(token))
         router.push('/')
       } else {
         // 處理回應成功卻未取得到 token 的異常錯誤

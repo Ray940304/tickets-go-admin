@@ -6,6 +6,14 @@
 npm install
 ```
 
+## 設置環境變數
+
+請創建一個 `.env.local` 文件，並從 `.env.example` 文件中複製變數名。然後填入你的實際環境變數值。例如：
+
+```bash
+cp .env.example .env.local
+```
+
 ## How to use
 
 ### 開發
@@ -16,7 +24,7 @@ npm run dev
 
 ## 環境
 
-- Ｎode 18
+- Ｎ ode 18
 - Next.js
 - Typescript
 

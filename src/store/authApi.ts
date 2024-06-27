@@ -3,7 +3,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: 'https://tickets-go-server-dev.onrender.com/api/v1/',
+    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any).auth.token
       if (token) {
@@ -15,7 +15,7 @@ export const authApi = createApi({
   }),
   endpoints: builder => ({
     getUsers: builder.query<any, void>({
-      query: () => 'auth/users'
+      query: () => 'user/users'
     }),
     registerUser: builder.mutation<
       any,

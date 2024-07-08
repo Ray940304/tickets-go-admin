@@ -28,7 +28,7 @@ const items2: MenuProps['items'] = [
     icon: <DashboardOutlined />,
     label: '活動管理',
     children: [
-      { key: '1', label: <Link href='/event'>活動總覽</Link> },
+      { key: '1', label: <Link href='/events'>活動總覽</Link> },
       { key: '2', label: <Link href='/tags'>標籤管理</Link> }
     ]
   },

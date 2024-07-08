@@ -48,6 +48,10 @@ const seatsData = {
   ]
 }
 
+// image folder
+const eBanner = 'event-banner'
+const eIntro = 'event-intro'
+
 interface EventType {
   key: string
   name: string
@@ -225,15 +229,13 @@ const Events: React.FC = () => {
         // await createEvent({ id: currentEvent.key, ...payload })
         message.success('活動已更新')
       } else {
-        const eventId = 'e000000'
-
         // 上傳 introImage
         if (introImageFileList.length > 0) {
           const introImageFile = introImageFileList[0].originFileObj
           if (introImageFile) {
             const formData = new FormData()
             formData.append('file', introImageFile)
-            const introImageResponse = await uploadEventImage({ eventId, file: formData }).unwrap()
+            const introImageResponse = await uploadEventImage({ eventId: eIntro, file: formData }).unwrap()
             values.introImage = introImageResponse.data.imgUrl
             console.log('values.introImage', values.introImage)
             payload.introImage = values.introImage
@@ -246,7 +248,7 @@ const Events: React.FC = () => {
           if (bannerImageFile) {
             const formData = new FormData()
             formData.append('file', bannerImageFile)
-            const bannerImageResponse = await uploadEventImage({ eventId, file: formData }).unwrap()
+            const bannerImageResponse = await uploadEventImage({ eventId: eBanner, file: formData }).unwrap()
             values.bannerImage = bannerImageResponse.data.imgUrl
             console.log('values.bannerImage', values.bannerImage)
             payload.bannerImage = values.bannerImage

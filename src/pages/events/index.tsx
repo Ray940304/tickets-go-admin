@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useGetAllEventsQuery, useCreateEventMutation, useDeleteEventsMutation } from '../../store/eventApi'
 import { useGetAllTagsQuery } from '../../store/tagApi'
+import { useUploadEventImageMutation } from '../../store/imageUploadApi'
 import {
   Space,
   Table,
@@ -16,7 +17,8 @@ import {
   DatePicker,
   TimePicker,
   Upload,
-  Select
+  Select,
+  Spin
 } from 'antd'
 import ImgCrop from 'antd-img-crop'
 import { UploadOutlined, PlusOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons'
@@ -85,6 +87,7 @@ type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0]
 const Events: React.FC = () => {
   const { data: eventsData, error: eventsError, isLoading: eventsLoading, refetch } = useGetAllEventsQuery()
   const { data: tagsData, error: tagsError, isLoading: tagsLoading } = useGetAllTagsQuery()
+  const [uploadEventImage, { isLoading: isUploading }] = useUploadEventImageMutation()
   const [createEvent] = useCreateEventMutation()
   const [deleteEvent] = useDeleteEventsMutation()
 
@@ -103,6 +106,7 @@ const Events: React.FC = () => {
   const [sessions, setSessions] = useState<SessionType[]>([])
   const [places, setPlaces] = useState<{ id: number; name: string }[]>([])
   const [seats, setSeats] = useState<SeatType[]>([])
+  const [spinning, setSpining] = useState(false)
 
   useEffect(() => {
     if (eventsData) {
@@ -164,20 +168,6 @@ const Events: React.FC = () => {
       if (event.bannerImage) {
         setBannerImageUrl(event.bannerImage)
       }
-    } else {
-      // 如果是新增活動，設置預設圖片
-      form.setFieldsValue({
-        introImage:
-          'https://t.kfs.io/upload_images/202464/%E5%82%B2%E7%AC%91%E9%80%A3%E4%BA%8C-%E4%B8%8D%E5%8B%99%E6%AD%A3%E6%A5%AD_KKTIX%2BFB_banner_large.png',
-        bannerImage:
-          'https://t.kfs.io/upload_images/202464/%E5%82%B2%E7%AC%91%E9%80%A3%E4%BA%8C-%E4%B8%8D%E5%8B%99%E6%AD%A3%E6%A5%AD_KKTIX%2BFB_banner_large.png'
-      })
-      setIntroImageUrl(
-        'https://t.kfs.io/upload_images/202464/%E5%82%B2%E7%AC%91%E9%80%A3%E4%BA%8C-%E4%B8%8D%E5%8B%99%E6%AD%A3%E6%A5%AD_KKTIX%2BFB_banner_large.png'
-      )
-      setBannerImageUrl(
-        'https://t.kfs.io/upload_images/202464/%E5%82%B2%E7%AC%91%E9%80%A3%E4%BA%8C-%E4%B8%8D%E5%8B%99%E6%AD%A3%E6%A5%AD_KKTIX%2BFB_banner_large.png'
-      )
     }
     setIsModalOpen(true)
   }
@@ -188,6 +178,7 @@ const Events: React.FC = () => {
   }
 
   const handleOk = async () => {
+    setSpining(true)
     try {
       const values = await form.validateFields()
 
@@ -217,13 +208,10 @@ const Events: React.FC = () => {
         name: values.eventName,
         intro: values.eventIntro,
         content: values.eventContent,
-        introImage:
-          'https://t.kfs.io/upload_images/202464/%E5%82%B2%E7%AC%91%E9%80%A3%E4%BA%8C-%E4%B8%8D%E5%8B%99%E6%AD%A3%E6%A5%AD_KKTIX%2BFB_banner_large.png',
-        bannerImage:
-          'https://t.kfs.io/upload_images/202464/%E5%82%B2%E7%AC%91%E9%80%A3%E4%BA%8C-%E4%B8%8D%E5%8B%99%E6%AD%A3%E6%A5%AD_KKTIX%2BFB_banner_large.png',
+        introImage: values.introImage || introImageUrl,
+        bannerImage: values.bannerImage || bannerImageUrl,
         organizer: values.organizer,
         eventRange,
-
         releaseDate: dayjs().valueOf().toString(), // 使用 valueOf() 轉換為 millis
         payments: values.payments,
         tags: values.tags,
@@ -233,11 +221,39 @@ const Events: React.FC = () => {
       }
 
       if (isEdit && currentEvent) {
+        // 更新活動
         // await createEvent({ id: currentEvent.key, ...payload })
         message.success('活動已更新')
       } else {
-        console.log('payload:', payload)
-        await createEvent(payload)
+        // 創建活動
+        const newEvent = await createEvent(payload).unwrap()
+        const eventId = newEvent.data._id
+        console.log('eventId', eventId)
+
+        // 上傳 introImage
+        if (introImageFileList.length > 0) {
+          const introImageFile = introImageFileList[0].originFileObj
+          if (introImageFile) {
+            const formData = new FormData()
+            formData.append('file', introImageFile)
+            const introImageResponse = await uploadEventImage({ eventId, file: formData }).unwrap()
+            values.introImage = introImageResponse.data.imgUrl
+            console.log('values.introImage', values.introImage)
+          }
+        }
+
+        // 上傳 bannerImage
+        if (bannerImageFileList.length > 0) {
+          const bannerImageFile = bannerImageFileList[0].originFileObj
+          if (bannerImageFile) {
+            const formData = new FormData()
+            formData.append('file', bannerImageFile)
+            const bannerImageResponse = await uploadEventImage({ eventId, file: formData }).unwrap()
+            values.bannerImage = bannerImageResponse.data.imgUrl
+            console.log('values.bannerImage', values.bannerImage)
+          }
+        }
+
         message.success('活動已新增')
       }
       setIsModalOpen(false)
@@ -245,6 +261,8 @@ const Events: React.FC = () => {
     } catch (error) {
       console.error('Failed to save event:', error)
       message.error('操作失敗，請稍後再試')
+    } finally {
+      setSpining(false)
     }
   }
 
@@ -305,7 +323,6 @@ const Events: React.FC = () => {
     setBannerImageFileList(fileList)
 
     if (file.status === 'done') {
-      // Assuming the response contains the URL of the uploaded image
       const uploadedUrl = file.response?.url as string
       setBannerImageUrl(uploadedUrl)
       message.success(`${file.name} file uploaded successfully`)
@@ -586,101 +603,102 @@ const Events: React.FC = () => {
         onOk={handleOk}
         onCancel={handleCancel}
         width={960}
+        okButtonProps={{ disabled: spinning }}
       >
-        <Form form={form} layout='vertical' initialValues={{}}>
-          <Form.Item name='eventName' label='活動名稱' rules={[{ required: true, message: '請輸入活動名稱' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name='eventIntro' label='活動簡述' rules={[{ required: true, message: '請輸入活動簡述' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name='eventContent' label='活動內容' rules={[{ required: true, message: '請輸入活動內容' }]}>
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
-          </Form.Item>
-          <Form.Item name='introImage' label='活動縮圖網址' rules={[{ required: true, message: '請上傳活動縮圖' }]}>
-            <div>
-              <ImgCrop rotationSlider>
+        <Spin spinning={spinning} tip='Loading...'>
+          <Form form={form} layout='vertical' initialValues={{}}>
+            <Form.Item name='eventName' label='活動名稱' rules={[{ required: true, message: '請輸入活動名稱' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name='eventIntro' label='活動簡述' rules={[{ required: true, message: '請輸入活動簡述' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name='eventContent' label='活動內容' rules={[{ required: true, message: '請輸入活動內容' }]}>
+              <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
+            </Form.Item>
+            <Form.Item name='introImage' label='活動縮圖網址' rules={[{ required: true, message: '請上傳活動縮圖' }]}>
+              <div>
+                <ImgCrop rotationSlider>
+                  <Upload
+                    listType='picture-card'
+                    fileList={introImageFileList}
+                    onChange={handleIntroImageChange}
+                    onPreview={onPreview}
+                    onRemove={() => setIntroImageFileList([])}
+                  >
+                    {introImageFileList.length < 1 && '+ Upload'}
+                  </Upload>
+                </ImgCrop>
+              </div>
+            </Form.Item>
+            <Form.Item
+              name='bannerImage'
+              label='活動橫幅圖網址'
+              rules={[{ required: true, message: '請上傳活動橫幅圖' }]}
+            >
+              <div>
                 <Upload
-                  // action='https://660d2bd96ddfa2943b33731c.mockapi.io/api/upload'
-                  listType='picture-card'
-                  fileList={introImageFileList}
-                  onChange={handleIntroImageChange}
-                  onPreview={onPreview}
-                  onRemove={() => setIntroImageFileList([])}
+                  listType='picture'
+                  fileList={bannerImageFileList}
+                  onChange={handleBannerImageChange}
+                  onRemove={() => setBannerImageFileList([])}
+                  maxCount={1}
+                  onPreview={handlePreview}
                 >
-                  {introImageFileList.length < 1 && '+ Upload'}
+                  {bannerImageFileList.length < 1 && <Button icon={<UploadOutlined />}>Upload</Button>}
                 </Upload>
-              </ImgCrop>
-            </div>
-          </Form.Item>
-          <Form.Item
-            name='bannerImage'
-            label='活動橫幅圖網址'
-            rules={[{ required: true, message: '請上傳活動橫幅圖' }]}
-          >
-            <div>
-              <Upload
-                // action='https://660d2bd96ddfa2943b33731c.mockapi.io/api/upload'
-                listType='picture'
-                fileList={bannerImageFileList}
-                onChange={handleBannerImageChange}
-                onRemove={() => setBannerImageFileList([])}
-                maxCount={1}
-                onPreview={handlePreview}
-              >
-                {bannerImageFileList.length < 1 && <Button icon={<UploadOutlined />}>Upload</Button>}
-              </Upload>
-            </div>
-          </Form.Item>
-          <Form.Item name='organizer' label='主辦單位' rules={[{ required: true, message: '請輸入主辦單位' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name='eventRange' label='販售日期' rules={[{ required: true, message: '請選擇販售日期' }]}>
-            <RangePicker showTime />
-          </Form.Item>
-          <Form.Item name='tags' label='活動標籤' rules={[{ required: true, message: '請選擇活動標籤' }]}>
-            <Select mode='multiple'>
-              {tagsData?.data.map((tag: any) => (
-                <Option key={tag._id} value={tag.tagName}>
-                  {tag.tagName}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name='payments' label='提供的付款方式' rules={[{ required: true, message: '請選擇付款方式' }]}>
-            <Select mode='multiple'>
-              <Option value='信用卡'>信用卡</Option>
-              <Option value='現金'>現金(尚未開放)</Option>
-              <Option value='第三方支付'>第三方支付(尚未開放)</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name='sessions' label='場次資訊'>
-            <Table
-              dataSource={sessions}
-              columns={sessionColumns}
-              pagination={false}
-              rowKey='key'
-              footer={() => (
-                <Button onClick={handleAddSession} icon={<PlusOutlined />} block>
-                  新增演出資訊
-                </Button>
-              )}
-            />
-          </Form.Item>
-          <Form.Item name='seat' label='票價資訊'>
-            <Table
-              dataSource={seats}
-              columns={seatColumns}
-              pagination={false}
-              rowKey='id'
-              footer={() => (
-                <Button onClick={handleAddSeat} icon={<PlusOutlined />} block>
-                  新增票價
-                </Button>
-              )}
-            />
-          </Form.Item>
-        </Form>
+              </div>
+            </Form.Item>
+            <Form.Item name='organizer' label='主辦單位' rules={[{ required: true, message: '請輸入主辦單位' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name='eventRange' label='販售日期' rules={[{ required: true, message: '請選擇販售日期' }]}>
+              <RangePicker showTime />
+            </Form.Item>
+            <Form.Item name='tags' label='活動標籤' rules={[{ required: true, message: '請選擇活動標籤' }]}>
+              <Select mode='multiple'>
+                {tagsData?.data.map((tag: any) => (
+                  <Option key={tag._id} value={tag.tagName}>
+                    {tag.tagName}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name='payments' label='提供的付款方式' rules={[{ required: true, message: '請選擇付款方式' }]}>
+              <Select mode='multiple'>
+                <Option value='信用卡'>信用卡</Option>
+                <Option value='現金'>現金(尚未開放)</Option>
+                <Option value='第三方支付'>第三方支付(尚未開放)</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name='sessions' label='場次資訊'>
+              <Table
+                dataSource={sessions}
+                columns={sessionColumns}
+                pagination={false}
+                rowKey='key'
+                footer={() => (
+                  <Button onClick={handleAddSession} icon={<PlusOutlined />} block>
+                    新增演出資訊
+                  </Button>
+                )}
+              />
+            </Form.Item>
+            <Form.Item name='seat' label='票價資訊'>
+              <Table
+                dataSource={seats}
+                columns={seatColumns}
+                pagination={false}
+                rowKey='id'
+                footer={() => (
+                  <Button onClick={handleAddSeat} icon={<PlusOutlined />} block>
+                    新增票價
+                  </Button>
+                )}
+              />
+            </Form.Item>
+          </Form>
+        </Spin>
       </Modal>
       <Modal title='確認刪除' open={isDeleteModalOpen} onOk={handleDeleteOk} onCancel={handleDeleteCancel}>
         <p>您確定要刪除此活動嗎？</p>

@@ -87,7 +87,7 @@ type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0]
 const Events: React.FC = () => {
   const { data: eventsData, error: eventsError, isLoading: eventsLoading, refetch } = useGetAllEventsQuery()
   const { data: tagsData, error: tagsError, isLoading: tagsLoading } = useGetAllTagsQuery()
-  const [uploadEventImage, { isLoading: isUploading }] = useUploadEventImageMutation()
+  const [uploadEventImage] = useUploadEventImageMutation()
   const [createEvent] = useCreateEventMutation()
   const [deleteEvent] = useDeleteEventsMutation()
 

@@ -225,10 +225,7 @@ const Events: React.FC = () => {
         // await createEvent({ id: currentEvent.key, ...payload })
         message.success('活動已更新')
       } else {
-        // 創建活動
-        const newEvent = await createEvent(payload).unwrap()
-        const eventId = newEvent.data._id
-        console.log('eventId', eventId)
+        const eventId = 'e000000'
 
         // 上傳 introImage
         if (introImageFileList.length > 0) {
@@ -239,6 +236,7 @@ const Events: React.FC = () => {
             const introImageResponse = await uploadEventImage({ eventId, file: formData }).unwrap()
             values.introImage = introImageResponse.data.imgUrl
             console.log('values.introImage', values.introImage)
+            payload.introImage = values.introImage
           }
         }
 
@@ -251,8 +249,17 @@ const Events: React.FC = () => {
             const bannerImageResponse = await uploadEventImage({ eventId, file: formData }).unwrap()
             values.bannerImage = bannerImageResponse.data.imgUrl
             console.log('values.bannerImage', values.bannerImage)
+            payload.bannerImage = values.bannerImage
           }
         }
+
+        // 創建活動
+        // const newEvent = await createEvent(payload).unwrap()
+        // const eventId = newEvent.data._id
+        // console.log('eventId', eventId)
+        // console.log('payload', payload)
+
+        await createEvent(payload).unwrap()
 
         message.success('活動已新增')
       }
@@ -614,7 +621,7 @@ const Events: React.FC = () => {
               <Input />
             </Form.Item>
             <Form.Item name='eventContent' label='活動內容' rules={[{ required: true, message: '請輸入活動內容' }]}>
-              <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
+              <Input.TextArea autoSize={{ minRows: 10, maxRows: 15 }} />
             </Form.Item>
             <Form.Item name='introImage' label='活動縮圖網址' rules={[{ required: true, message: '請上傳活動縮圖' }]}>
               <div>

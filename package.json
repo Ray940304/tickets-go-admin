@@ -12,7 +12,9 @@
     "@ant-design/cssinjs": "^1.20.0",
     "@reduxjs/toolkit": "^2.2.4",
     "antd": "^5.18.3",
+    "antd-img-crop": "^4.22.0",
     "date-fns": "^3.6.0",
+    "dayjs": "^1.11.11",
     "js-cookie": "^3.0.5",
     "next": "14.2.3",
     "react": "^18",
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",
+    "@types/moment": "^2.13.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

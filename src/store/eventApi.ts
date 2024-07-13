@@ -45,6 +45,31 @@ export const eventApi = createApi({
         body
       })
     }),
+    updateEvent: builder.mutation<
+      any,
+      {
+        id: string
+        name: string
+        intro: string
+        content: string
+        introImage: string
+        bannerImage: string
+        organizer: string
+        eventRange: { startDate: number; endDate: number }
+        releaseDate: string
+        payments: number[]
+        tags: string[]
+        category: string[]
+        sessions: { date: number; timeRange: { startTime: string; endTime: string }; place: string }[]
+        prices: { area: string; price: number }[]
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `event/${id}`,
+        method: 'PATCH',
+        body
+      })
+    }),
     deleteEvents: builder.mutation<any, { eventId: string[] }>({
       query: ({ eventId }) => ({
         url: 'event/events',
@@ -55,4 +80,10 @@ export const eventApi = createApi({
   })
 })
 
-export const { useGetAllEventsQuery, useGetEventByIdQuery, useCreateEventMutation, useDeleteEventsMutation } = eventApi
+export const {
+  useGetAllEventsQuery,
+  useGetEventByIdQuery,
+  useCreateEventMutation,
+  useUpdateEventMutation,
+  useDeleteEventsMutation
+} = eventApi

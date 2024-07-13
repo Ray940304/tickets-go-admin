@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { useGetAllEventsQuery, useCreateEventMutation, useDeleteEventsMutation } from '../../store/eventApi'
+import {
+  useGetAllEventsQuery,
+  useGetEventByIdQuery,
+  useCreateEventMutation,
+  useUpdateEventMutation,
+  useDeleteEventsMutation
+} from '../../store/eventApi'
 import { useGetAllTagsQuery } from '../../store/tagApi'
 import { useUploadEventImageMutation } from '../../store/imageUploadApi'
 import {
@@ -57,6 +63,9 @@ interface EventType {
   name: string
   intro: string
   content: string
+  eventName: string
+  eventIntro: string
+  eventContent: string
   introImage: string
   bannerImage: string
   organizer: string
@@ -65,7 +74,6 @@ interface EventType {
   releaseDate: string
   payments: string[]
   tags: string[]
-  category: string[]
   updatedAt?: string
   sessions?: SessionType[]
   seat?: SeatType[]
@@ -93,12 +101,19 @@ const Events: React.FC = () => {
   const { data: tagsData, error: tagsError, isLoading: tagsLoading } = useGetAllTagsQuery()
   const [uploadEventImage] = useUploadEventImageMutation()
   const [createEvent] = useCreateEventMutation()
+  const [updateEvent] = useUpdateEventMutation() // 新增的更新事件的 hook
   const [deleteEvent] = useDeleteEventsMutation()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [currentEvent, setCurrentEvent] = useState<EventType | null>(null)
+  const [currentEventId, setCurrentEventId] = useState<string | null>(null)
+  const {
+    data: eventDetails,
+    isLoading: eventDetailsLoading,
+    isError: eventDetailsError
+  } = useGetEventByIdQuery(currentEventId ?? '', { skip: !currentEventId })
   const [form] = Form.useForm()
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
@@ -110,7 +125,7 @@ const Events: React.FC = () => {
   const [sessions, setSessions] = useState<SessionType[]>([])
   const [places, setPlaces] = useState<{ id: number; name: string }[]>([])
   const [seats, setSeats] = useState<SeatType[]>([])
-  const [spinning, setSpining] = useState(false)
+  const [spinning, setSpinning] = useState(false)
 
   useEffect(() => {
     if (eventsData) {
@@ -155,24 +170,103 @@ const Events: React.FC = () => {
     }
   }, [])
 
-  const showModal = (event?: EventType) => {
-    setCurrentEvent(event || null)
-    setIsEdit(!!event)
-    form.resetFields()
-    setIntroImageFileList([])
-    setBannerImageFileList([])
-    setIntroImageUrl(null)
-    setBannerImageUrl(null)
-    setSessions(event?.sessions || [])
-    if (event) {
-      form.setFieldsValue(event)
-      if (event.introImage) {
-        setIntroImageUrl(event.introImage)
+  useEffect(() => {
+    if (eventDetails && !eventDetailsLoading && !eventDetailsError) {
+      const eventData = eventDetails.data.event
+      const sessionsData = eventDetails.data.sessions || []
+
+      console.log('Sessions Data:', sessionsData)
+
+      form.setFieldsValue({
+        eventName: eventData.eventName,
+        eventIntro: eventData.eventIntro,
+        eventContent: eventData.eventContent,
+        organizer: eventData.organizer,
+        eventRange: [dayjs(eventData.eventStartDate), dayjs(eventData.eventEndDate)],
+        tags: eventData.tags,
+        payments: eventData.payments,
+        sessions: sessionsData.map(session => ({
+          date: dayjs(Number(session.startDate)).format('YYYY-MM-DD'),
+          timeRange: [dayjs(session.startTime, 'HH:mm'), dayjs(session.endTime, 'HH:mm')],
+          place: session.place
+        }))
+      })
+
+      if (eventData.introImage) {
+        setIntroImageFileList([
+          {
+            uid: '-1',
+            name: 'introImage',
+            status: 'done',
+            url: eventData.introImage
+          }
+        ])
+        setIntroImageUrl(eventData.introImage)
       }
-      if (event.bannerImage) {
-        setBannerImageUrl(event.bannerImage)
+
+      if (eventData.bannerImage) {
+        setBannerImageFileList([
+          {
+            uid: '-1',
+            name: 'bannerImage',
+            status: 'done',
+            url: eventData.bannerImage
+          }
+        ])
+        setBannerImageUrl(eventData.bannerImage)
       }
+
+      setSessions(
+        sessionsData.map(session => ({
+          key: session.sessionId,
+          date: dayjs(Number(session.startDate)).format('YYYY-MM-DD'),
+          startTime: session.startTime,
+          endTime: session.endTime,
+          place: session.place
+        }))
+      )
+
+      setSeats(
+        sessionsData.length > 0
+          ? sessionsData[0].prices.map((price, index) => ({
+              id: index,
+              areaName: price.area,
+              price: price.price,
+              quantity: 0 // 如果需要數量，這裡需要更新
+            }))
+          : []
+      )
+
+      setSpinning(false)
     }
+  }, [eventDetails, eventDetailsLoading, eventDetailsError])
+
+  const showModal = async (event?: EventType) => {
+    if (event) {
+      // 編輯模式
+      setSpinning(true)
+      setCurrentEvent(event)
+      setCurrentEventId(event.key)
+      setIsEdit(true)
+      form.resetFields()
+      setIntroImageFileList([])
+      setBannerImageFileList([])
+      setIntroImageUrl(null)
+      setBannerImageUrl(null)
+    } else {
+      // 新增模式
+      setCurrentEvent(null)
+      setCurrentEventId(null)
+      setIsEdit(false)
+      form.resetFields()
+      setIntroImageFileList([])
+      setBannerImageFileList([])
+      setIntroImageUrl(null)
+      setBannerImageUrl(null)
+      setSessions([])
+      setSeats(seatsData['台北小巨蛋'])
+    }
+
     setIsModalOpen(true)
   }
 
@@ -182,27 +276,28 @@ const Events: React.FC = () => {
   }
 
   const handleOk = async () => {
-    setSpining(true)
+    setSpinning(true)
     try {
       const values = await form.validateFields()
 
       // Transform the eventRange to include startDate and endDate
       const eventRange = {
-        startDate: values.eventRange[0].valueOf(), // 使用 valueOf() 轉換為 millis
-        endDate: values.eventRange[1].valueOf() // 使用 valueOf() 轉換為 millis
+        startDate: values.eventRange[0].valueOf(),
+        endDate: values.eventRange[1].valueOf()
       }
 
-      const sessionsData =
-        sessions.map((session: any) => ({
-          date: dayjs(session.date).valueOf(), // 使用 valueOf() 轉換為 millis
-          timeRange: {
-            startTime: session.startTime,
-            endTime: session.endTime
-          },
-          place: session.place
-        })) || []
+      const sessionsData = sessions.map((session: any) => ({
+        date: dayjs(session.date).valueOf(),
 
-      // Ensure prices field is correctly mapped
+        // startTime: session.startTime,
+        // endTime: session.endTime,
+        timeRange: {
+          startTime: dayjs(session.startTime, 'HH:mm').valueOf(),
+          endTime: dayjs(session.endTime, 'HH:mm').valueOf()
+        },
+        place: session.place
+      }))
+
       const prices = seats.map((seat: any) => ({
         area: seat.areaName,
         price: seat.price
@@ -216,17 +311,16 @@ const Events: React.FC = () => {
         bannerImage: values.bannerImage || bannerImageUrl,
         organizer: values.organizer,
         eventRange,
-        releaseDate: dayjs().valueOf().toString(), // 使用 valueOf() 轉換為 millis
+        releaseDate: dayjs().valueOf(),
         payments: values.payments,
         tags: values.tags,
-        category: values.tags,
         sessions: sessionsData,
         prices
       }
 
       if (isEdit && currentEvent) {
         // 更新活動
-        // await createEvent({ id: currentEvent.key, ...payload })
+        await updateEvent({ id: currentEvent.key, ...payload }).unwrap()
         message.success('活動已更新')
       } else {
         // 上傳 introImage
@@ -237,7 +331,6 @@ const Events: React.FC = () => {
             formData.append('file', introImageFile)
             const introImageResponse = await uploadEventImage({ eventId: eIntro, file: formData }).unwrap()
             values.introImage = introImageResponse.data.imgUrl
-            console.log('values.introImage', values.introImage)
             payload.introImage = values.introImage
           }
         }
@@ -250,19 +343,13 @@ const Events: React.FC = () => {
             formData.append('file', bannerImageFile)
             const bannerImageResponse = await uploadEventImage({ eventId: eBanner, file: formData }).unwrap()
             values.bannerImage = bannerImageResponse.data.imgUrl
-            console.log('values.bannerImage', values.bannerImage)
             payload.bannerImage = values.bannerImage
           }
         }
 
         // 創建活動
-        // const newEvent = await createEvent(payload).unwrap()
-        // const eventId = newEvent.data._id
-        // console.log('eventId', eventId)
-        // console.log('payload', payload)
-
+        console.log('payload:', payload)
         await createEvent(payload).unwrap()
-
         message.success('活動已新增')
       }
       setIsModalOpen(false)
@@ -271,7 +358,7 @@ const Events: React.FC = () => {
       console.error('Failed to save event:', error)
       message.error('操作失敗，請稍後再試')
     } finally {
-      setSpining(false)
+      setSpinning(false)
     }
   }
 
